@@ -1,0 +1,6 @@
+apiVersion: v2
+name: airflow-monitor
+description: A Helm chart for Airflow DAGs monitoring application
+type: application
+version: 0.1.0
+appVersion: "1.0.0" 
