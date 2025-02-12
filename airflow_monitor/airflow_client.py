@@ -3,29 +3,48 @@ import requests
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import logging
+from vault_client import VaultClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class AirflowClient:
-    def __init__(self, csv_path: str):
+    def __init__(self, csv_path: str, vault_client: VaultClient):
         self.environments_df = pd.read_csv(csv_path)
         self.session = requests.Session()
+        self.vault_client = vault_client
+        self.credentials_cache = {}
     
     def get_airflow_url(self, ap_code: str, env: str, tenant_suffix: str) -> str:
         return f"https://astronomer-{ap_code}-{env}-{tenant_suffix}.data.cloud.net.intra"
     
-    def get_dag_info(self, base_url: str, dag_id: str) -> Dict:
+    def get_credentials(self, project: str, environment: str) -> Dict[str, str]:
+        """Get cached credentials or fetch new ones from Vault"""
+        cache_key = f"{project}/{environment}"
+        if cache_key not in self.credentials_cache:
+            self.credentials_cache[cache_key] = self.vault_client.get_airflow_credentials(project, environment)
+        return self.credentials_cache[cache_key]
+    
+    def get_dag_info(self, base_url: str, dag_id: str, project: str, environment: str) -> Dict:
         try:
+            # Get credentials for authentication
+            credentials = self.get_credentials(project, environment)
+            
             # Get DAG details
             dag_url = f"{base_url}/api/v1/dags/{dag_id}"
-            dag_response = self.session.get(dag_url)
+            dag_response = self.session.get(
+                dag_url,
+                auth=(credentials['username'], credentials['password'])
+            )
             dag_response.raise_for_status()
             dag_data = dag_response.json()
 
             # Get last DAG run
             dag_runs_url = f"{base_url}/api/v1/dags/{dag_id}/dagRuns?limit=1&order_by=-start_date"
-            runs_response = self.session.get(dag_runs_url)
+            runs_response = self.session.get(
+                dag_runs_url,
+                auth=(credentials['username'], credentials['password'])
+            )
             runs_response.raise_for_status()
             runs_data = runs_response.json()
 
@@ -56,15 +75,26 @@ class AirflowClient:
         )
         
         try:
+            # Get credentials for authentication
+            credentials = self.get_credentials(project_row['project_name'], project_row['env'])
+            
             # Get list of DAGs
             dags_url = f"{base_url}/api/v1/dags"
-            response = self.session.get(dags_url)
+            response = self.session.get(
+                dags_url,
+                auth=(credentials['username'], credentials['password'])
+            )
             response.raise_for_status()
             dags_data = response.json()
 
             results = []
             for dag in dags_data['dags']:
-                dag_info = self.get_dag_info(base_url, dag['dag_id'])
+                dag_info = self.get_dag_info(
+                    base_url, 
+                    dag['dag_id'],
+                    project_row['project_name'],
+                    project_row['env']
+                )
                 dag_info.update({
                     'project_name': project_row['project_name'],
                     'environment': project_row['env'],

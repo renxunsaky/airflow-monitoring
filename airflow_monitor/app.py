@@ -1,6 +1,7 @@
 from flask import Flask, render_template, jsonify
 from flask_apscheduler import APScheduler
 from airflow_client import AirflowClient
+from vault_client import VaultClient
 import os
 import json
 from datetime import datetime
@@ -8,8 +9,28 @@ from datetime import datetime
 app = Flask(__name__)
 scheduler = APScheduler()
 
-# Initialize the Airflow client with the CSV file
-client = AirflowClient('projects.csv')
+# Default paths for local development
+DEFAULT_STAGING_CERT_PATH = "certs/staging/client.crt"
+DEFAULT_STAGING_KEY_PATH = "certs/staging/client.key"
+DEFAULT_PROD_CERT_PATH = "certs/prod/client.crt"
+DEFAULT_PROD_KEY_PATH = "certs/prod/client.key"
+
+# Get configuration from environment or use defaults
+STAGING_CERT_PATH = os.getenv('VAULT_STAGING_CERT_PATH', DEFAULT_STAGING_CERT_PATH)
+STAGING_KEY_PATH = os.getenv('VAULT_STAGING_KEY_PATH', DEFAULT_STAGING_KEY_PATH)
+PROD_CERT_PATH = os.getenv('VAULT_PROD_CERT_PATH', DEFAULT_PROD_CERT_PATH)
+PROD_KEY_PATH = os.getenv('VAULT_PROD_KEY_PATH', DEFAULT_PROD_KEY_PATH)
+
+# Initialize the Vault client with both sets of credentials
+vault_client = VaultClient(
+    staging_cert_path=STAGING_CERT_PATH,
+    staging_key_path=STAGING_KEY_PATH,
+    prod_cert_path=PROD_CERT_PATH,
+    prod_key_path=PROD_KEY_PATH
+)
+
+# Initialize the Airflow client with the CSV file and Vault client
+client = AirflowClient('projects.csv', vault_client)
 
 # Global variable to store the latest data
 latest_data = []
