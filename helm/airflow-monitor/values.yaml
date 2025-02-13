@@ -65,6 +65,8 @@ vault:
   staging:
     address: "https://vault.staging.net"
     certPath: "secret/data/certificates/airflow-monitor/staging"  # Path in Vault where the staging certificate is stored
+    namespace: "admin/staging"  # Vault namespace for authentication
   prod:
     address: "https://vault.group.net"
-    certPath: "secret/data/certificates/airflow-monitor/prod"  # Path in Vault where the prod certificate is stored 
+    certPath: "secret/data/certificates/airflow-monitor/prod"  # Path in Vault where the prod certificate is stored
+    namespace: "admin/prod"  # Vault namespace for authentication 

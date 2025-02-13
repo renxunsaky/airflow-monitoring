@@ -15,18 +15,26 @@ DEFAULT_STAGING_KEY_PATH = "certs/staging/client.key"
 DEFAULT_PROD_CERT_PATH = "certs/prod/client.crt"
 DEFAULT_PROD_KEY_PATH = "certs/prod/client.key"
 
+# Default Vault namespaces
+DEFAULT_STAGING_NAMESPACE = "admin/staging"
+DEFAULT_PROD_NAMESPACE = "admin/prod"
+
 # Get configuration from environment or use defaults
 STAGING_CERT_PATH = os.getenv('VAULT_STAGING_CERT_PATH', DEFAULT_STAGING_CERT_PATH)
 STAGING_KEY_PATH = os.getenv('VAULT_STAGING_KEY_PATH', DEFAULT_STAGING_KEY_PATH)
 PROD_CERT_PATH = os.getenv('VAULT_PROD_CERT_PATH', DEFAULT_PROD_CERT_PATH)
 PROD_KEY_PATH = os.getenv('VAULT_PROD_KEY_PATH', DEFAULT_PROD_KEY_PATH)
+STAGING_NAMESPACE = os.getenv('VAULT_STAGING_NAMESPACE', DEFAULT_STAGING_NAMESPACE)
+PROD_NAMESPACE = os.getenv('VAULT_PROD_NAMESPACE', DEFAULT_PROD_NAMESPACE)
 
-# Initialize the Vault client with both sets of credentials
+# Initialize the Vault client with both sets of credentials and namespaces
 vault_client = VaultClient(
     staging_cert_path=STAGING_CERT_PATH,
     staging_key_path=STAGING_KEY_PATH,
     prod_cert_path=PROD_CERT_PATH,
-    prod_key_path=PROD_KEY_PATH
+    prod_key_path=PROD_KEY_PATH,
+    staging_namespace=STAGING_NAMESPACE,
+    prod_namespace=PROD_NAMESPACE
 )
 
 # Initialize the Airflow client with the CSV file and Vault client

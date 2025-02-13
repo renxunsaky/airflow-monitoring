@@ -7,11 +7,14 @@ logger = logging.getLogger(__name__)
 
 class VaultClient:
     def __init__(self, staging_cert_path: str, staging_key_path: str, 
-                 prod_cert_path: str, prod_key_path: str):
+                 prod_cert_path: str, prod_key_path: str,
+                 staging_namespace: str, prod_namespace: str):
         self.staging_cert_path = staging_cert_path
         self.staging_key_path = staging_key_path
         self.prod_cert_path = prod_cert_path
         self.prod_key_path = prod_key_path
+        self.staging_namespace = staging_namespace
+        self.prod_namespace = prod_namespace
         self.staging_client = None
         self.prod_client = None
         self._initialize_clients()
@@ -23,6 +26,10 @@ class VaultClient:
                 url="https://vault.staging.net",
                 cert=(self.staging_cert_path, self.staging_key_path)
             )
+            # Set namespace before authentication
+            self.staging_client.adapter.session.headers.update({
+                'X-Vault-Namespace': self.staging_namespace
+            })
             self.staging_client.auth.cert.login()
             logger.info("Successfully authenticated to staging Vault")
 
@@ -31,6 +38,10 @@ class VaultClient:
                 url="https://vault.group.net",
                 cert=(self.prod_cert_path, self.prod_key_path)
             )
+            # Set namespace before authentication
+            self.prod_client.adapter.session.headers.update({
+                'X-Vault-Namespace': self.prod_namespace
+            })
             self.prod_client.auth.cert.login()
             logger.info("Successfully authenticated to production Vault")
         except Exception as e:
@@ -53,10 +64,13 @@ class VaultClient:
         try:
             client = self._get_client_for_environment(environment)
             
-            # Construct the Vault path based on project and environment
-            vault_namespace = f"{project}/{environment}"
+            # Save current namespace header
+            current_namespace = client.adapter.session.headers.get('X-Vault-Namespace')
+            
+            # Set project-specific namespace for credential retrieval
+            project_namespace = f"{project}/{environment}"
             client.adapter.session.headers.update({
-                'X-Vault-Namespace': vault_namespace
+                'X-Vault-Namespace': project_namespace
             })
             
             # Read the secret from Vault
@@ -75,5 +89,10 @@ class VaultClient:
             logger.error(f"Failed to get Airflow credentials for {project}/{environment}: {str(e)}")
             raise
         finally:
-            # Clear the namespace header after use
-            client.adapter.session.headers.pop('X-Vault-Namespace', None) 
+            # Restore original namespace
+            if current_namespace:
+                client.adapter.session.headers.update({
+                    'X-Vault-Namespace': current_namespace
+                })
+            else:
+                client.adapter.session.headers.pop('X-Vault-Namespace', None) 

@@ -78,6 +78,10 @@ spec:
               value: "/app/certs/prod/tls.crt"
             - name: VAULT_PROD_KEY_PATH
               value: "/app/certs/prod/tls.key"
+            - name: VAULT_STAGING_NAMESPACE
+              value: {{ .Values.vault.staging.namespace | quote }}
+            - name: VAULT_PROD_NAMESPACE
+              value: {{ .Values.vault.prod.namespace | quote }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
