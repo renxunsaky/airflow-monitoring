@@ -11,6 +11,8 @@
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/rowgroup/1.1.3/css/rowGroup.bootstrap5.min.css" rel="stylesheet">
+    <!-- Add Select extension CSS -->
+    <link href="https://cdn.datatables.net/select/1.3.4/css/select.bootstrap5.min.css" rel="stylesheet">
     
     <style>
         .status-green { color: #28a745; }
@@ -29,22 +31,51 @@
             background-color: #f8f9fa !important;
             padding-left: 2em !important;
         }
+        .filter-section {
+            margin: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .filter-section select {
+            margin-right: 15px;
+        }
     </style>
 </head>
 <body>
     <div class="container-fluid">
         <h1 class="mt-4 mb-4">Airflow DAGs Monitor</h1>
         <div class="refresh-time">Last updated: <span id="lastUpdate">-</span></div>
+        
+        <div class="filter-section">
+            <div class="row">
+                <div class="col-md-3">
+                    <label>Environment:</label>
+                    <select id="envFilter" class="form-select">
+                        <option value="">All Environments</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label>Project:</label>
+                    <select id="projectFilter" class="form-select">
+                        <option value="">All Projects</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="table-container">
             <table id="dagsTable" class="table table-striped table-bordered">
                 <thead>
                     <tr>
-                        <th>Project Name</th>
                         <th>Environment</th>
+                        <th>Project Name</th>
                         <th>Airflow Version</th>
                         <th>DAG Name</th>
                         <th>Enabled</th>
+                        <th>Schedule</th>
                         <th>Last Run Time</th>
+                        <th>Expected Last Run Time</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -62,9 +93,29 @@
     <script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
     <script src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.bootstrap5.min.js"></script>
     <script src="https://cdn.datatables.net/rowgroup/1.1.3/js/dataTables.rowGroup.min.js"></script>
+    <script src="https://cdn.datatables.net/select/1.3.4/js/dataTables.select.min.js"></script>
     
     <script>
         let table;
+        
+        function updateFilters(data) {
+            const environments = [...new Set(data.map(item => item.environment))];
+            const projects = [...new Set(data.map(item => item.project_name))];
+            
+            const envFilter = $('#envFilter');
+            const projectFilter = $('#projectFilter');
+            
+            envFilter.empty().append('<option value="">All Environments</option>');
+            projectFilter.empty().append('<option value="">All Projects</option>');
+            
+            environments.forEach(env => {
+                envFilter.append(`<option value="${env}">${env}</option>`);
+            });
+            
+            projects.forEach(project => {
+                projectFilter.append(`<option value="${project}">${project}</option>`);
+            });
+        }
         
         function updateTable() {
             fetch('/api/dags')
@@ -74,30 +125,14 @@
                         table.destroy();
                     }
 
-                    // Process data to add group IDs
-                    let projectEnvVersions = {};
-                    data.forEach(item => {
-                        const key = `${item.project_name}-${item.environment}`;
-                        if (!projectEnvVersions[key]) {
-                            projectEnvVersions[key] = item.version;
-                        }
-                    });
+                    updateFilters(data);
                     
                     table = $('#dagsTable').DataTable({
                         data: data,
                         columns: [
-                            { 
-                                data: 'project_name',
-                                visible: false
-                            },
-                            { 
-                                data: 'environment',
-                                visible: false
-                            },
-                            { 
-                                data: 'version',
-                                visible: false
-                            },
+                            { data: 'environment' },
+                            { data: 'project_name' },
+                            { data: 'version' },
                             { data: 'dag_id' },
                             { 
                                 data: 'is_enabled',
@@ -107,17 +142,24 @@
                                         '<span class="status-red">No</span>';
                                 }
                             },
+                            { data: 'schedule' },
                             { 
                                 data: 'last_run_time',
                                 render: function(data) {
-                                    return data ? new Date(data).toLocaleString() : 'Never';
+                                    return data ? new Date(data).toLocaleString() : '';
+                                }
+                            },
+                            { 
+                                data: 'expected_last_run_time',
+                                render: function(data) {
+                                    return data ? new Date(data).toLocaleString() : '';
                                 }
                             },
                             { 
                                 data: 'status',
                                 render: function(data) {
                                     const statusClass = data === 'success' ? 'status-green' : 'status-red';
-                                    return `<span class="${statusClass}">${data}</span>`;
+                                    return `<span class="${statusClass}">${data || ''}</span>`;
                                 }
                             }
                         ],
@@ -125,22 +167,34 @@
                         pageLength: 25,
                         dom: 'Bfrtip',
                         buttons: ['copy', 'csv', 'excel'],
-                        rowGroup: {
-                            dataSrc: ['project_name', 'environment'],
-                            startRender: function(rows, group, level) {
-                                let groupClass = level === 0 ? 'project-group' : 'env-group';
-                                if (level === 0) {
-                                    return $('<tr/>')
-                                        .append('<td colspan="5" class="' + groupClass + '">Project: ' + group + '</td>');
-                                } else {
-                                    const projectName = rows.data()[0].project_name;
-                                    const envName = group;
-                                    const version = projectEnvVersions[`${projectName}-${envName}`];
-                                    return $('<tr/>')
-                                        .append('<td colspan="5" class="' + groupClass + '">Environment: ' + envName + ' (Airflow ' + version + ')</td>');
-                                }
-                            }
+                        initComplete: function () {
+                            // Add individual column filtering
+                            this.api().columns().every(function () {
+                                let column = this;
+                                let title = $(column.header()).text();
+                                
+                                // Create input element
+                                let input = $('<input type="text" placeholder="Filter ' + title + '" />')
+                                    .appendTo($(column.header()))
+                                    .on('keyup change', function () {
+                                        if (column.search() !== this.value) {
+                                            column
+                                                .search(this.value)
+                                                .draw();
+                                        }
+                                    });
+                            });
                         }
+                    });
+
+                    // Add event listeners for filters
+                    $('#envFilter, #projectFilter').on('change', function() {
+                        const envVal = $('#envFilter').val();
+                        const projectVal = $('#projectFilter').val();
+                        
+                        table.columns(0).search(envVal);
+                        table.columns(1).search(projectVal);
+                        table.draw();
                     });
                     
                     $('#lastUpdate').text(new Date().toLocaleString());

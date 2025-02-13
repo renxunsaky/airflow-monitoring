@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 import logging
 from vault_client import VaultClient
+from croniter import croniter
+import pendulum
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +27,27 @@ class AirflowClient:
             self.credentials_cache[cache_key] = self.vault_client.get_airflow_credentials(project, environment)
         return self.credentials_cache[cache_key]
     
+    def get_expected_last_run_time(self, schedule: str, last_run_time: str) -> Optional[str]:
+        """Calculate the expected last run time based on schedule and last run time"""
+        try:
+            if not schedule or not last_run_time:
+                return None
+
+            # Convert to pendulum datetime for better timezone handling
+            last_run = pendulum.parse(last_run_time)
+            
+            # Create croniter instance
+            cron = croniter(schedule, last_run)
+            
+            # Get the previous execution time according to schedule
+            expected_last_run = cron.get_prev(datetime)
+            
+            return expected_last_run.isoformat()
+            
+        except Exception as e:
+            logger.error(f"Error calculating expected last run time: {str(e)}")
+            return None
+
     def get_dag_info(self, base_url: str, dag_id: str, project: str, environment: str) -> Dict:
         try:
             # Get credentials for authentication
@@ -49,13 +72,17 @@ class AirflowClient:
             runs_data = runs_response.json()
 
             last_run = runs_data['dag_runs'][0] if runs_data['dag_runs'] else None
+            schedule = dag_data.get('schedule_interval', None)
+            last_run_time = last_run['start_date'] if last_run else None
             
             return {
                 'dag_id': dag_id,
                 'is_enabled': dag_data['is_paused'] == False,
-                'last_run_time': last_run['start_date'] if last_run else None,
+                'last_run_time': last_run_time,
                 'status': last_run['state'] if last_run else 'No runs',
-                'version': dag_data.get('version', 'N/A')
+                'version': dag_data.get('version', 'N/A'),
+                'schedule': schedule,
+                'expected_last_run_time': self.get_expected_last_run_time(schedule, last_run_time) if schedule and last_run_time else None
             }
         except Exception as e:
             logger.error(f"Error fetching DAG info for {dag_id}: {str(e)}")
@@ -64,7 +91,9 @@ class AirflowClient:
                 'is_enabled': False,
                 'last_run_time': None,
                 'status': 'Error',
-                'version': 'N/A'
+                'version': 'N/A',
+                'schedule': None,
+                'expected_last_run_time': None
             }
 
     def get_all_dags(self, project_row: pd.Series) -> List[Dict]:
