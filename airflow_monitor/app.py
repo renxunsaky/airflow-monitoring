@@ -43,12 +43,17 @@ client = AirflowClient('projects.csv', vault_client)
 
 # Global variable to store the latest data
 latest_data = []
+last_update_time = None
 
 def update_dag_data():
     """Background job to update DAG data"""
-    global latest_data
-    latest_data = client.get_all_projects_dags()
-    app.logger.info(f"Updated DAG data at {datetime.now()}")
+    global latest_data, last_update_time
+    try:
+        latest_data = client.get_all_projects_dags()
+        last_update_time = datetime.now()
+        app.logger.info(f"Updated DAG data at {last_update_time}")
+    except Exception as e:
+        app.logger.error(f"Error updating DAG data: {str(e)}")
 
 @app.route('/')
 def index():
@@ -56,6 +61,10 @@ def index():
 
 @app.route('/api/dags')
 def get_dags():
+    global latest_data, last_update_time
+    # If this is the first request or data is older than 5 minutes, update it
+    if not last_update_time or (datetime.now() - last_update_time).total_seconds() > 300:
+        update_dag_data()
     return jsonify(latest_data)
 
 # Add a route to serve static files directly
@@ -80,9 +89,6 @@ def create_app():
     scheduler.add_job(id='update_dag_data', func=update_dag_data, 
                      trigger='interval', minutes=5)
     scheduler.start()
-    
-    # Initial data load
-    update_dag_data()
     
     return app
 
