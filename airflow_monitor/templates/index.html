@@ -105,12 +105,44 @@
             background-color: var(--bnp-green-light) !important;
             color: var(--bnp-green) !important;
         }
+
+        /* Add these specific column width styles */
+        #dagsTable th:nth-child(1),  /* Environment */
+        #dagsTable td:nth-child(1) {
+            max-width: 80px !important;
+            width: 80px !important;
+        }
+
+        #dagsTable th:nth-child(3),  /* Airflow Version */
+        #dagsTable td:nth-child(3) {
+            max-width: 100px !important;
+            width: 100px !important;
+        }
+
+        #dagsTable th:nth-child(5),  /* Enabled */
+        #dagsTable td:nth-child(5) {
+            max-width: 70px !important;
+            width: 70px !important;
+        }
+
+        /* Add this to ensure the table respects column widths */
+        #dagsTable {
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        /* Add text truncation for long content */
+        #dagsTable td {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="logo-container">
-            <img src="/static/bnp-logo.png" alt="BNP Paribas" class="logo">
+            <img src="{{ url_for('static', filename='bnp-logo.png') }}" alt="BNP Paribas" class="logo">
             <h1 class="page-title">Airflow DAGs Monitor</h1>
         </div>
     </div>
@@ -201,18 +233,9 @@
                     table = $('#dagsTable').DataTable({
                         data: data,
                         columns: [
-                            { 
-                                data: 'environment',
-                                width: '100px'
-                            },
-                            { 
-                                data: 'project_name',
-                                width: '100px'
-                            },
-                            { 
-                                data: 'version',
-                                width: '100px'
-                            },
+                            { data: 'environment' },
+                            { data: 'project_name' },
+                            { data: 'version' },
                             { data: 'dag_id' },
                             { 
                                 data: 'is_enabled',

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, send_from_directory
 from flask_apscheduler import APScheduler
 from airflow_client import AirflowClient
 from vault_client import VaultClient
@@ -6,7 +6,8 @@ import os
 import json
 from datetime import datetime
 
-app = Flask(__name__, static_folder='static')
+app = Flask(__name__, 
+    static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), 'static')))
 scheduler = APScheduler()
 
 # Default paths for local development
@@ -57,10 +58,15 @@ def index():
 def get_dags():
     return jsonify(latest_data)
 
+# Add a route to serve static files directly
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    return send_from_directory(app.static_folder, filename)
+
 def create_app():
-    # Create necessary directories
-    os.makedirs('airflow_monitor/templates', exist_ok=True)
-    os.makedirs('airflow_monitor/static', exist_ok=True)
+    # Ensure the static directory exists and is in the correct location
+    static_dir = os.path.join(os.path.dirname(__file__), 'static')
+    os.makedirs(static_dir, exist_ok=True)
     
     # Configure scheduler
     app.config['SCHEDULER_API_ENABLED'] = True
