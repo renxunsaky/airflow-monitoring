@@ -5,6 +5,7 @@ from vault_client import VaultClient
 import os
 import json
 from datetime import datetime
+import threading
 
 app = Flask(__name__, 
     static_folder=os.path.abspath(os.path.join(os.path.dirname(__file__), 'static')))
@@ -44,16 +45,25 @@ client = AirflowClient('projects.csv', vault_client)
 # Global variable to store the latest data
 latest_data = []
 last_update_time = None
+data_lock = threading.Lock()  # Add thread safety
 
 def update_dag_data():
     """Background job to update DAG data"""
     global latest_data, last_update_time
     try:
-        latest_data = client.get_all_projects_dags()
-        last_update_time = datetime.now()
+        new_data = client.get_all_projects_dags()
+        with data_lock:
+            latest_data = new_data
+            last_update_time = datetime.now()
         app.logger.info(f"Updated DAG data at {last_update_time}")
     except Exception as e:
         app.logger.error(f"Error updating DAG data: {str(e)}")
+
+def initial_data_load():
+    """Initial data load in background"""
+    app.logger.info("Starting initial data load...")
+    update_dag_data()
+    app.logger.info("Initial data load completed")
 
 @app.route('/')
 def index():
@@ -62,10 +72,14 @@ def index():
 @app.route('/api/dags')
 def get_dags():
     global latest_data, last_update_time
-    # If this is the first request or data is older than 5 minutes, update it
-    if not last_update_time or (datetime.now() - last_update_time).total_seconds() > 300:
-        update_dag_data()
-    return jsonify(latest_data)
+    with data_lock:
+        # If no data is available yet, trigger an update
+        if not last_update_time:
+            update_dag_data()
+        # If data is older than 5 minutes, trigger background update
+        elif (datetime.now() - last_update_time).total_seconds() > 300:
+            threading.Thread(target=update_dag_data).start()
+        return jsonify(latest_data)
 
 # Add a route to serve static files directly
 @app.route('/static/<path:filename>')
@@ -79,7 +93,7 @@ def static_files(filename):
         return f"Error: {str(e)}", 404
 
 def create_app():
-    # Ensure the static directory exists and is in the correct location
+    # Ensure the static directory exists
     static_dir = os.path.join(os.path.dirname(__file__), 'static')
     os.makedirs(static_dir, exist_ok=True)
     
@@ -89,6 +103,9 @@ def create_app():
     scheduler.add_job(id='update_dag_data', func=update_dag_data, 
                      trigger='interval', minutes=5)
     scheduler.start()
+    
+    # Start initial data load in background
+    threading.Thread(target=initial_data_load).start()
     
     return app
 
