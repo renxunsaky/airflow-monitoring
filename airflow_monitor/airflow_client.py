@@ -16,6 +16,7 @@ class AirflowClient:
         self.session = requests.Session()
         self.vault_client = vault_client
         self.credentials_cache = {}
+        self.version_cache = {}  # Cache for Airflow versions
     
     def get_airflow_url(self, ap_code: str, env: str, tenant_suffix: str) -> str:
         return f"https://astronomer-{ap_code}-{env}-{tenant_suffix}.data.cloud.net.intra"
@@ -26,6 +27,24 @@ class AirflowClient:
         if cache_key not in self.credentials_cache:
             self.credentials_cache[cache_key] = self.vault_client.get_airflow_credentials(project, environment)
         return self.credentials_cache[cache_key]
+    
+    def get_airflow_version(self, base_url: str, credentials: Dict[str, str]) -> str:
+        """Get Airflow version from API"""
+        cache_key = base_url
+        if cache_key not in self.version_cache:
+            try:
+                version_url = f"{base_url}/api/v1/version"
+                response = self.session.get(
+                    version_url,
+                    auth=(credentials['username'], credentials['password'])
+                )
+                response.raise_for_status()
+                version_data = response.json()
+                self.version_cache[cache_key] = version_data.get('version', 'N/A')
+            except Exception as e:
+                logger.error(f"Error fetching Airflow version for {base_url}: {str(e)}")
+                self.version_cache[cache_key] = 'N/A'
+        return self.version_cache[cache_key]
     
     def get_expected_last_run_time(self, schedule: str, last_run_time: str) -> Optional[str]:
         """Calculate the expected last run time based on schedule and last run time"""
@@ -80,7 +99,7 @@ class AirflowClient:
                 'is_enabled': dag_data['is_paused'] == False,
                 'last_run_time': last_run_time,
                 'status': last_run['state'] if last_run else 'No runs',
-                'version': dag_data.get('version', 'N/A'),
+                'version': self.get_airflow_version(base_url, credentials),
                 'schedule': schedule,
                 'expected_last_run_time': self.get_expected_last_run_time(schedule, last_run_time) if schedule and last_run_time else None
             }
