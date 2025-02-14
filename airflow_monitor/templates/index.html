@@ -106,36 +106,60 @@
             color: var(--bnp-green) !important;
         }
 
-        /* Add these specific column width styles */
+        /* Column width styles for both header and body */
         #dagsTable th:nth-child(1),  /* Environment */
         #dagsTable td:nth-child(1) {
             max-width: 80px !important;
             width: 80px !important;
+            min-width: 80px !important;
         }
 
         #dagsTable th:nth-child(3),  /* Airflow Version */
         #dagsTable td:nth-child(3) {
             max-width: 100px !important;
             width: 100px !important;
+            min-width: 100px !important;
         }
 
         #dagsTable th:nth-child(5),  /* Enabled */
         #dagsTable td:nth-child(5) {
             max-width: 70px !important;
             width: 70px !important;
+            min-width: 70px !important;
         }
 
-        /* Add this to ensure the table respects column widths */
+        /* Table layout settings */
         #dagsTable {
             table-layout: fixed;
             width: 100%;
         }
 
-        /* Add text truncation for long content */
+        /* Header and cell common styles */
+        #dagsTable th,
         #dagsTable td {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            padding: 8px !important;
+        }
+
+        /* Style for the filter inputs in headers */
+        #dagsTable thead input {
+            width: 100%;
+            box-sizing: border-box;
+            margin-top: 5px;
+        }
+
+        /* Ensure the DataTables wrapper doesn't interfere with widths */
+        .dataTables_wrapper {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        /* Force header alignment */
+        .dataTables_scrollHead,
+        .dataTables_scrollBody {
+            width: 100% !important;
         }
     </style>
 </head>
@@ -271,6 +295,7 @@
                         dom: 'Bfrtip',
                         buttons: ['copy', 'csv', 'excel'],
                         scrollX: true,
+                        autoWidth: false,
                         initComplete: function () {
                             // Add individual column filtering
                             this.api().columns().every(function () {
