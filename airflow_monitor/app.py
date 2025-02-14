@@ -61,7 +61,13 @@ def get_dags():
 # Add a route to serve static files directly
 @app.route('/static/<path:filename>')
 def static_files(filename):
-    return send_from_directory(app.static_folder, filename)
+    app.logger.info(f"Requesting static file: {filename}")
+    app.logger.info(f"Static folder path: {app.static_folder}")
+    try:
+        return send_from_directory(app.static_folder, filename)
+    except Exception as e:
+        app.logger.error(f"Error serving static file: {str(e)}")
+        return f"Error: {str(e)}", 404
 
 def create_app():
     # Ensure the static directory exists and is in the correct location
