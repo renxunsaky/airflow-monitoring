@@ -249,7 +249,27 @@
                 .then(response => response.json())
                 .then(data => {
                     if (table) {
-                        table.destroy();
+                        // Properly destroy the existing table and remove all data
+                        table.clear().destroy();
+                        // Remove the entire table HTML content
+                        $('#dagsTable').empty();
+                        // Recreate the table header structure
+                        $('#dagsTable').html(`
+                            <thead>
+                                <tr>
+                                    <th>Environment</th>
+                                    <th>Project Name</th>
+                                    <th>Airflow Version</th>
+                                    <th>DAG Name</th>
+                                    <th>Enabled</th>
+                                    <th>Schedule</th>
+                                    <th>Last Run Time</th>
+                                    <th>Expected Last Run Time</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        `);
                     }
 
                     updateFilters(data);
