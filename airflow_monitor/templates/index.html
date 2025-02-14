@@ -161,6 +161,21 @@
         .dataTables_scrollBody {
             width: 100% !important;
         }
+
+        /* Loading spinner styles */
+        .loading-container {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            background-color: var(--bnp-green-light);
+            border-radius: 5px;
+            margin: 20px;
+        }
+
+        .spinner-border {
+            color: var(--bnp-green);
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -188,6 +203,15 @@
                         <option value="">All Projects</option>
                     </select>
                 </div>
+            </div>
+        </div>
+
+        <div id="loadingIndicator" class="loading-container">
+            <div class="d-flex justify-content-center align-items-center">
+                <div class="spinner-border" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Loading DAG data... This might take a few seconds.</span>
             </div>
         </div>
 
@@ -245,6 +269,11 @@
         }
         
         function updateTable() {
+            // Show loading indicator
+            $('#loadingIndicator').show();
+            // Hide table until data is loaded
+            $('.table-container').hide();
+            
             fetch('/api/dags')
                 .then(response => response.json())
                 .then(data => {
@@ -347,6 +376,19 @@
                     });
                     
                     $('#lastUpdate').text(new Date().toLocaleString());
+                    
+                    // Hide loading indicator and show table
+                    $('#loadingIndicator').hide();
+                    $('.table-container').show();
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    // Show error message to user
+                    $('#loadingIndicator').html(`
+                        <div class="alert alert-danger" role="alert">
+                            Error loading data. Please try refreshing the page.
+                        </div>
+                    `);
                 });
         }
         
